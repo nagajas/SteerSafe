@@ -2,7 +2,7 @@
 # Main Script for Running Steering Experiments
 # ==========================================
 
-
+import os
 import argparse
 import json
 import random
@@ -11,23 +11,18 @@ from aggregators import get_scaled_mean_aggregator, get_private_mean_aggregator
 from steering_vectors import train_steering_vector, pca_aggregator
 from evaluation import evaluate_model
 
-def load_and_prep_data(dsname, tokenizer, use_hf=True):
-    if use_hf:
-        # Load directly from Anthropic's HF repo
-        # We split the data into a 80/20 train/test split locally
-        full_data = load_anthropic_dataset(dsname, split="train")
-        full_data = list(full_data)
-        random.seed(42)
-        random.shuffle(full_data)
+def load_and_prep_data(tokenizer):
+    random.seed(21)
+    
+    with jsonlines.open('myopic-reward.jsonl') as reader:
+        data = [obj for obj in reader]
+        random.shuffle(data)
         
-        split_idx = int(len(full_data) * 0.8)
-        train_data = full_data[:split_idx]
-        test_data = full_data[split_idx:]
-    else:
-        train_data = json.load(open(f"./datasets/generate/{dsname}/generate_dataset.json", 'r'))
-        test_data = json.load(open(f"./datasets/test/{dsname}/test_dataset_ab.json", 'r'))
+        split_idx = int(0.8 * len(data))
+        train_data = data[:split_idx]
+        test_data = data[split_idx:]
 
-    return get_ds(train_data, tokenizer), get_ds(test_data, tokenizer)
+        return get_ds(train_data, tokenizer), get_ds(test_data, tokenizer)
 
 
 def run_experiment(args):
@@ -35,7 +30,7 @@ def run_experiment(args):
     model, tokenizer = load_mdl_tkzr(args.model)
     
     print(f"Loading Dataset: {args.dataset}...")
-    train_dataset, test_dataset = load_and_prep_data(args.dataset, tokenizer)
+    train_dataset, test_dataset = load_and_prep_data(tokenizer)
 
     if args.steering_method == 'private':
         print(f"Configuring Private Steering (Clip={args.clip}, Noise={args.noise_multiplier})")
@@ -65,9 +60,8 @@ def run_experiment(args):
         multipliers.insert(0, 0.0)
 
     for multiplier in multipliers:
-        # Context manager applies the vector to the model's activations
         with steering_vector.apply(model, multiplier=multiplier, min_token_index=0):
-            result = evaluate_model(model, tokenizer, test_dataset, show_progress=False, device=device)
+            result = evaluate_model(model, tokenizer, test_dataset, show_progress=False, device=DEVICE)
             
             mode_label = "Baseline" if multiplier == 0.0 else f"Steered {multiplier:+.1f}"
             print(f"[{args.steering_method.upper()}] {mode_label:25} | Alignment: {result:.4f}")

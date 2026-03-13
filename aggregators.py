@@ -6,7 +6,7 @@ import torch
 import math
 from dataclasses import dataclass
 from typing import Iterable, Callable
-from utils import device
+from utils import DEVICE
 
 def get_scaled_mean_aggregator():
     """Returns an aggregator for standard, non-private mean steering."""
@@ -35,7 +35,7 @@ def get_private_mean_aggregator(clip, noise_multiplier):
         mu = torch.mean(diff, dim=0)
         
         # 3. DP Noise Injection
-        noise = torch.normal(0, 1.0, size=mu.shape).to(device)
+        noise = torch.normal(0, 1.0, size=mu.shape).to(DEVICE)
         return mu + (noise_multiplier * noise)
         
     return priv_mean

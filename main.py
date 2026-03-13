@@ -6,15 +6,18 @@ import os
 import argparse
 import json
 import random
+import jsonlines
 from utils import *
 from aggregators import get_scaled_mean_aggregator, get_private_mean_aggregator
 from steering_vectors import train_steering_vector, pca_aggregator
 from evaluation import evaluate_model
 
-def load_and_prep_data(tokenizer):
+DATASET_PATH = "datasets/"
+
+def load_and_prep_data(tokenizer, args):
     random.seed(21)
     
-    with jsonlines.open('myopic-reward.jsonl') as reader:
+    with jsonlines.open(f'{DATASET_PATH}{args.dataset}.jsonl') as reader:
         data = [obj for obj in reader]
         random.shuffle(data)
         
@@ -30,7 +33,7 @@ def run_experiment(args):
     model, tokenizer = load_mdl_tkzr(args.model)
     
     print(f"Loading Dataset: {args.dataset}...")
-    train_dataset, test_dataset = load_and_prep_data(tokenizer)
+    train_dataset, test_dataset = load_and_prep_data(tokenizer, args)
 
     if args.steering_method == 'private':
         print(f"Configuring Private Steering (Clip={args.clip}, Noise={args.noise_multiplier})")
@@ -71,11 +74,24 @@ if __name__ == '__main__':
     
     # Model & Data args
     parser.add_argument("--model", default="meta-llama/Llama-2-7B-chat-hf", help="HuggingFace model ID")
-    parser.add_argument("--dataset", default="sycophancy", 
+    parser.add_argument("--dataset", default="myopic-reward", help="Dataset name for training and evaluation",
         choices=[
-            'sycophancy', 'survival-instinct', 'wealth-seeking', 
-            'myopic-reward', 'coordinate-other-ais', 
-            'corrigible-neutral-HHH', 'corrigible-less-HHH'
+            'coordinate-itself',
+            'coordinate-other-ais',
+            'coordinate-other-versions',
+            'corrigible-less-HHH',
+            'corrigible-more-HHH',
+            'corrigible-neutral-HHH',
+            'myopic-reward',
+            'one-box-tendency',
+            'power-seeking-inclination',
+            'self-awareness-general-ai',
+            'self-awareness-good-text-model',
+            'self-awareness-text-model',
+            'self-awareness-training-architecture',
+            'self-awareness-web-gpt',
+            'survival-instinct',
+            'wealth-seeking-inclination',
         ]
     )
     # Steering Config args
@@ -84,8 +100,8 @@ if __name__ == '__main__':
     parser.add_argument("--multipliers", type=float, nargs='+', default=[-2.0, 0.0, 2.0], help="Steering strengths (gamma) to evaluate")
     
     # Privacy Math args
-    parser.add_argument("--noise_multiplier", default=0.02, type=float, help="Gaussian noise standard deviation (PSA)")
-    parser.add_argument("--clip", default=20, type=float, help="L2 Norm clipping factor (PSA)")
+    parser.add_argument("--noise_multiplier", default=0.02, type=float, help="Gaussian noise standard deviation")
+    parser.add_argument("--clip", default=20, type=float, help="L2 Norm clipping factor")
 
     args = parser.parse_args()
     run_experiment(args)

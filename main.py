@@ -11,16 +11,24 @@ from aggregators import get_scaled_mean_aggregator, get_private_mean_aggregator
 from steering_vectors import train_steering_vector, pca_aggregator
 from evaluation import evaluate_model
 
-def load_and_prep_data(dsname, tokenizer):
-    """Loads JSON data and converts it into contrastive pairs."""
-    train_data = json.load(open(f"./datasets/generate/{dsname}/generate_dataset.json", 'r'))
-    test_data = json.load(open(f"./datasets/test/{dsname}/test_dataset_ab.json", 'r'))
-
-    random.seed(42)
-    random.shuffle(train_data)
-    random.shuffle(test_data)
+def load_and_prep_data(dsname, tokenizer, use_hf=True):
+    if use_hf:
+        # Load directly from Anthropic's HF repo
+        # We split the data into a 80/20 train/test split locally
+        full_data = load_anthropic_dataset(dsname, split="train")
+        full_data = list(full_data)
+        random.seed(42)
+        random.shuffle(full_data)
+        
+        split_idx = int(len(full_data) * 0.8)
+        train_data = full_data[:split_idx]
+        test_data = full_data[split_idx:]
+    else:
+        train_data = json.load(open(f"./datasets/generate/{dsname}/generate_dataset.json", 'r'))
+        test_data = json.load(open(f"./datasets/test/{dsname}/test_dataset_ab.json", 'r'))
 
     return get_ds(train_data, tokenizer), get_ds(test_data, tokenizer)
+
 
 def run_experiment(args):
     print(f"Loading Model: {args.model}...")
@@ -69,8 +77,13 @@ if __name__ == '__main__':
     
     # Model & Data args
     parser.add_argument("--model", default="meta-llama/Llama-2-7B-chat-hf", help="HuggingFace model ID")
-    parser.add_argument("--dataset", default="sycophancy", choices=['sycophancy', 'hallucination', 'refusal', 'myopic-reward', 'survival-instinct', 'coordinate-other-ais', 'corrigible-neutral-HHH'])
-    
+    parser.add_argument("--dataset", default="sycophancy", 
+        choices=[
+            'sycophancy', 'survival-instinct', 'wealth-seeking', 
+            'myopic-reward', 'coordinate-other-ais', 
+            'corrigible-neutral-HHH', 'corrigible-less-HHH'
+        ]
+    )
     # Steering Config args
     parser.add_argument("--steering_method", default="private", choices=["mean", "private", "pca"], help="Type of vector aggregation")
     parser.add_argument("--layers", type=int, nargs='+', default=[11, 12, 13, 14, 15], help="Middle layers to apply steering on")

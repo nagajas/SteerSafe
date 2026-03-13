@@ -7,6 +7,7 @@ import torch
 import matplotlib.pyplot as plt
 import numpy as np
 from tqdm import tqdm
+from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer # type: ignore
 
 
@@ -18,6 +19,10 @@ def load_mdl_tkzr(model_name: str):
     model = model.to(device)
     
     return model, tokenizer
+
+def load_anthropic_dataset(subset_name: str, split="train"):
+    dataset = load_dataset("Anthropic/model-written-evals", f"advanced-ai-risk-{subset_name}", split=split)
+    return dataset
 
 def tokenize_and_encode(tokenizer, text):
     return tokenizer.encode(text, return_tensors='pt').to(device)
@@ -34,8 +39,14 @@ def extract_pair_annot(data, tokenizer):
     """ 
     Format: <|user|>\n{question}<|end|>\n<|assistant|>\n{answer}<|end|>
     """
-    p = format_phi(tokenizer, data['answer_matching_behavior'], data)
-    n = format_phi(tokenizer, data['answer_not_matching_behavior'], data)
+    if any(name in tokenizer.name_or_path.lower() for name in ['llama', 'mistral']):
+        prompt_template = "<s> [INST] \n<<SYS>>You are a helpful, honest assistant.<</SYS>>\n\n {question} [/INST] {answer}"
+        p = prompt_template.format(question=data['question'], answer=data['answer_matching_behavior'])
+        n = prompt_template.format(question=data['question'], answer=data['answer_not_matching_behavior'])
+    
+    else:
+        p = format_phi(tokenizer, data['answer_matching_behavior'], data)
+        n = format_phi(tokenizer, data['answer_not_matching_behavior'], data)
 
     return p, n
 
@@ -54,7 +65,6 @@ def plot_alignment_comparison(results_dict):
     datasets = list(results_dict.keys())
     mean_scores = [results_dict[d]['mean'] for d in datasets]
     private_scores = [results_dict[d]['private'] for d in datasets]
-    scaled_scores = 0.8 * private_scores + 0.2 * mean_scores # Simple heuristic to create a "scaled" version of private steering for visualization 
     zero_shot_scores = [results_dict[d]['zero_shot'] for d in datasets]
 
     x = np.arange(len(datasets))

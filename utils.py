@@ -9,7 +9,10 @@ import numpy as np
 from tqdm import tqdm
 # from datasets import load_dataset
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
+from dotenv import load_dotenv
 
+load_dotenv(os.path.join(os.path.dirname(__file__), 'secrets.env'))
+TOKEN = os.getenv("HF_HUB_TOKEN")
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -27,7 +30,7 @@ def load_mdl_tkzr(model_name: str):
         # tokenizer.add_special_tokens({'pad_token': '[PAD]'})
         model = AutoModelForCausalLM.from_pretrained(
             model_name, 
-            token = os.getenv("HF_HUB_TOKEN"),
+            token = TOKEN, #os.getenv("HF_HUB_TOKEN"),
             quantization_config=bnb_config, 
             device_map='auto',
             trust_remote_code=True
